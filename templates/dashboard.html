@@ -10,6 +10,9 @@
 
 <body>
     <h1>Hello you are logged in.</h1>
+    <h3> Camera on! </h3>
+    <img class="camera-bg" style="width: 100%; height:80%; background-attachment: fixed;" id="bg" class="center"
+        src="{{ url_for('video_feed') }}">
     <a href="{{url_for('logout')}}">Press here to logout</a>
 </body>
 
