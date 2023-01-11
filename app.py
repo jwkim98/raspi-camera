@@ -13,13 +13,14 @@ from wtforms import StringField, PasswordField, SubmitField
 from wtforms.validators import InputRequired, Length, ValidationError
 from flask_bcrypt import Bcrypt
 from camera import VideoCamera
+import os, argparse
 
 
 app = Flask(__name__)
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///database.db"
-app.config["SECRET_KEY"] = "thisisasecretkey"
+app.config["SECRET_KEY"] = os.urandom(16)
 
 
 login_manager = LoginManager()
@@ -46,27 +47,6 @@ class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(20), nullable=False, unique=True)
     password = db.Column(db.String(80), nullable=False)
-
-
-class RegisterForm(FlaskForm):
-    username = StringField(
-        validators=[InputRequired(), Length(min=4, max=20)],
-        render_kw={"placeholder": "Username"},
-    )
-
-    password = PasswordField(
-        validators=[InputRequired(), Length(min=8, max=20)],
-        render_kw={"placeholder": "Password"},
-    )
-
-    submit = SubmitField("Register")
-
-    def validate_username(self, username):
-        existing_user_username = User.query.filter_by(username=username.data).first()
-        if existing_user_username:
-            raise ValidationError(
-                "That username already exists. Please choose a different one."
-            )
 
 
 class LoginForm(FlaskForm):
@@ -113,20 +93,6 @@ def logout():
     return redirect(url_for("login"))
 
 
-@app.route("/register", methods=["GET", "POST"])
-def register():
-    form = RegisterForm()
-
-    if form.validate_on_submit():
-        hashed_password = bcrypt.generate_password_hash(form.password.data)
-        new_user = User(username=form.username.data, password=hashed_password)
-        db.session.add(new_user)
-        db.session.commit()
-        return redirect(url_for("login"))
-
-    return render_template("register.html", form=form)
-
-
 @app.route("/video_feed")
 @login_required
 def video_feed():
@@ -136,4 +102,16 @@ def video_feed():
 
 
 if __name__ == "__main__":
+    db.session.query(User).delete()
+    db.session.commit()
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--username", type=str)
+    parser.add_argument("--password", type=str)
+    args = parser.parse_args()
+
+    hashed_password = bcrypt.generate_password_hash(args.password)
+    new_user = User(username=args.username, password=hashed_password)
+    db.session.add(new_user)
+    db.session.commit()
     app.run(debug=False)
