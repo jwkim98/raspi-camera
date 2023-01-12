@@ -13,14 +13,15 @@ from wtforms import StringField, PasswordField, SubmitField
 from wtforms.validators import InputRequired, Length, ValidationError
 from flask_bcrypt import Bcrypt
 from camera import VideoCamera
-import os, argparse
+from mail import send_image_mail
+import os, argparse, serial
 
 
 app = Flask(__name__)
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///database.db"
-app.config["SECRET_KEY"] = os.urandom(16)
+app.config["SECRET_KEY"] = os.urandom(24)
 
 
 login_manager = LoginManager()
@@ -28,6 +29,17 @@ login_manager.init_app(app)
 login_manager.login_view = "login"
 
 pi_camera = VideoCamera(flip=True)
+
+# ser = serial.Serial(
+#     port="/dev/ttyS0",  # Replace ttyS0 with ttyAM0 for Pi1,Pi2,Pi0
+#     baudrate=9600,
+#     parity=serial.PARITY_NONE,
+#     stopbits=serial.STOPBITS_ONE,
+#     bytesize=serial.EIGHTBITS,
+#     timeout=1,
+# )
+
+mail_address = ""
 
 
 def gen(camera):
@@ -101,6 +113,36 @@ def video_feed():
     )
 
 
+@app.route("/left")
+@login_required
+def left():
+    print("Left")
+    # ser.write("l")
+    return "nothing"
+
+
+@app.route("/right")
+@login_required
+def right():
+    print("Right")
+    # ser.write("r")
+    return "nothing"
+
+
+# Take a photo when pressing camera button
+@app.route("/picture")
+@login_required
+def take_picture():
+    print("Picture taken")
+    send_mail()
+    return "None"
+
+
+def send_mail():
+    file_name = pi_camera.take_picture()
+    send_image_mail(file_name, mail_address)
+
+
 if __name__ == "__main__":
     db.session.query(User).delete()
     db.session.commit()
@@ -108,10 +150,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--username", type=str)
     parser.add_argument("--password", type=str)
+    parser.add_argument("--mail", type=str)
     args = parser.parse_args()
 
     hashed_password = bcrypt.generate_password_hash(args.password)
     new_user = User(username=args.username, password=hashed_password)
+    mail_address = args.mail
+    del args
     db.session.add(new_user)
     db.session.commit()
     app.run(debug=False)

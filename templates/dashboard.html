@@ -13,7 +13,57 @@
     <h3> Camera on! </h3>
     <img class="camera-bg" style="width: 100%; height:80%; background-attachment: fixed;" id="bg" class="center"
         src="{{ url_for('video_feed') }}">
+
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+    <script type=text/javascript>
+            $(function() {
+                $('a#left').on('click', function(e) {
+                e.preventDefault()
+                $.getJSON('/left',
+                    function(data) {
+                    //do nothing
+                });
+                return false;
+                });
+                $('a#right').on('click', function(e) {
+                e.preventDefault()
+                $.getJSON('/right',
+                    function(data) {
+                    //do nothing
+                });
+                return false;
+                });
+                $('a#take-picture').on('click', function(e) {
+                e.preventDefault()
+                $.getJSON('/picture',
+                    function(data) {
+                    //do nothing
+                });
+                return false;
+                });
+            });
+    
+    </script>
+    <div class='container'>
+        <form>
+            <a href=# id=left><button class='btn btn-default'>Left</button></a>
+        </form>
+
+    </div>
+    <div class='container'>
+        <form>
+            <a href=# id=right><button class='btn btn-default'>Right</button></a>
+        </form>
+    </div>
+
+    <div class='container'>
+        <form>
+            <a href=# id=take-picture><button class='btn btn-default'>Take picture</button></a>
+        </form>
+    </div>
+
     <a href="{{url_for('logout')}}">Press here to logout</a>
+
 </body>
 
 </html>
