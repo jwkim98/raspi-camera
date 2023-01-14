@@ -14,7 +14,10 @@ from wtforms.validators import InputRequired, Length, ValidationError
 from flask_bcrypt import Bcrypt
 from camera import VideoCamera
 from mail import send_image_mail
-import os, argparse, serial
+from gpiozero import Servo
+import os, argparse, serial, time, readchar, signal
+import RPi.GPIO as GPIO
+import pigpio
 
 
 app = Flask(__name__)
@@ -29,15 +32,12 @@ login_manager.init_app(app)
 login_manager.login_view = "login"
 
 pi_camera = VideoCamera(flip=True)
+servo = pigpio.pi()
+servo_pin = 21
+sensor = 20
+position = 1500
+alert = False
 
-# ser = serial.Serial(
-#     port="/dev/ttyS0",  # Replace ttyS0 with ttyAM0 for Pi1,Pi2,Pi0
-#     baudrate=9600,
-#     parity=serial.PARITY_NONE,
-#     stopbits=serial.STOPBITS_ONE,
-#     bytesize=serial.EIGHTBITS,
-#     timeout=1,
-# )
 
 mail_address = ""
 
@@ -116,16 +116,22 @@ def video_feed():
 @app.route("/left")
 @login_required
 def left():
+    global position
     print("Left")
-    # ser.write("l")
+    if position <= 2000:
+        position += 50
+    servo.set_servo_pulsewidth(servo_pin, position)
     return "nothing"
 
 
 @app.route("/right")
 @login_required
 def right():
+    global position
     print("Right")
-    # ser.write("r")
+    if position >= 1000:
+        position -= 50
+    servo.set_servo_pulsewidth(servo_pin, position)
     return "nothing"
 
 
@@ -133,14 +139,30 @@ def right():
 @app.route("/picture")
 @login_required
 def take_picture():
-    print("Picture taken")
-    send_mail()
+    print("alert on")
+    global alert
+    alert = True
     return "None"
 
 
-def send_mail():
-    file_name = pi_camera.take_picture()
-    send_image_mail(file_name, mail_address)
+def handler(signum, frame):
+    msg = "stopping server : (y.n)"
+    print(msg, end="", flush=True)
+    res = readchar.readchar()
+    if res == "y":
+        pi_camera.stop()
+        running = False
+        GPIO.cleanup()
+        exit(1)
+    else:
+        print("", end="\r", flush=True)
+
+
+def alert_detected(channel):
+    print("Detected somebody!")
+    if alert:
+        file_name = pi_camera.take_picture()
+        send_image_mail(file_name, mail_address)
 
 
 if __name__ == "__main__":
@@ -159,4 +181,14 @@ if __name__ == "__main__":
     del args
     db.session.add(new_user)
     db.session.commit()
-    app.run(debug=False)
+
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setup(sensor, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+    GPIO.add_event_detect(sensor, GPIO.FALLING, callback=alert_detected, bouncetime=100)
+
+    servo.set_servo_pulsewidth(servo_pin, position)
+    signal.signal(signal.SIGINT, handler)
+
+    # serve(app, host="0.0.0.0", port=56742)
+    app.run(host="0.0.0.0", debug=False)
